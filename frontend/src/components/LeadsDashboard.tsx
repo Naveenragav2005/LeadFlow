@@ -3,12 +3,14 @@
 import { RotateCw } from "lucide-react";
 import { useState } from "react";
 
+import { AddLeadDialog } from "@/components/AddLeadDialog";
 import { Header } from "@/components/Header";
 import { LeadList } from "@/components/LeadList";
 import { Toolbar } from "@/components/Toolbar";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useLeads } from "@/hooks/useLeads";
 import { useNow } from "@/hooks/useNow";
+import { matchesFilters } from "@/lib/leads";
 import type { Lead, LeadStatus } from "@/types";
 
 export function LeadsDashboard() {
@@ -16,14 +18,26 @@ export function LeadsDashboard() {
   const [searchInput, setSearchInput] = useState("");
   const search = useDebouncedValue(searchInput.trim(), 250);
 
-  const { leads, error, isLoading, hasLoaded, reload } = useLeads(statusFilter, search);
+  const { leads, error, isLoading, hasLoaded, reload, upsertLead } = useLeads(statusFilter, search);
   const now = useNow();
 
   const [, setSelectedLead] = useState<Lead | null>(null);
+  const [isAddingLead, setIsAddingLead] = useState(false);
+
+  function handleLeadCreated(lead: Lead) {
+    setIsAddingLead(false);
+    if (matchesFilters(lead, { status: statusFilter, search })) {
+      upsertLead(lead);
+    } else {
+      // Clear filters so the new lead is visible; this refetches the list.
+      setStatusFilter(null);
+      setSearchInput("");
+    }
+  }
 
   return (
     <>
-      <Header onAddLead={() => {}} />
+      <Header onAddLead={() => setIsAddingLead(true)} />
 
       <main className="mx-auto max-w-4xl space-y-8 px-4 py-6 sm:px-6">
         <Toolbar
@@ -57,6 +71,8 @@ export function LeadsDashboard() {
           />
         </div>
       </main>
+
+      {isAddingLead && <AddLeadDialog onClose={() => setIsAddingLead(false)} onCreated={handleLeadCreated} />}
     </>
   );
 }
