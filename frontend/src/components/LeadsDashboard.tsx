@@ -6,6 +6,7 @@ import { useState } from "react";
 import { AddLeadDialog } from "@/components/AddLeadDialog";
 import { Header } from "@/components/Header";
 import { LeadList } from "@/components/LeadList";
+import { LeadTimelineDialog } from "@/components/LeadTimelineDialog";
 import { Toolbar } from "@/components/Toolbar";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useLeads } from "@/hooks/useLeads";
@@ -21,8 +22,14 @@ export function LeadsDashboard() {
   const { leads, error, isLoading, hasLoaded, reload, upsertLead } = useLeads(statusFilter, search);
   const now = useNow();
 
-  const [, setSelectedLead] = useState<Lead | null>(null);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [isAddingLead, setIsAddingLead] = useState(false);
+
+  /** Apply the API's latest version of a lead to the list and the open dialog. */
+  function handleLeadUpdated(lead: Lead) {
+    upsertLead(lead);
+    setSelectedLead((current) => (current?.id === lead.id ? lead : current));
+  }
 
   function handleLeadCreated(lead: Lead) {
     setIsAddingLead(false);
@@ -61,17 +68,29 @@ export function LeadsDashboard() {
           </div>
         )}
 
-        <div className={isLoading && hasLoaded ? "opacity-60 transition-opacity" : "transition-opacity"}>
-          <LeadList
-            leads={leads}
-            now={now}
-            hasLoaded={hasLoaded}
-            isFiltered={statusFilter !== null || search !== ""}
-            onSelect={setSelectedLead}
-          />
-        </div>
+        {/* With nothing loaded, the error banner alone says enough; empty states would mislead. */}
+        {!(error && leads.length === 0) && (
+          <div className={isLoading && hasLoaded ? "opacity-60 transition-opacity" : "transition-opacity"}>
+            <LeadList
+              leads={leads}
+              now={now}
+              hasLoaded={hasLoaded}
+              isFiltered={statusFilter !== null || search !== ""}
+              onSelect={setSelectedLead}
+            />
+          </div>
+        )}
       </main>
 
+      {selectedLead && (
+        <LeadTimelineDialog
+          key={selectedLead.id}
+          lead={selectedLead}
+          now={now}
+          onClose={() => setSelectedLead(null)}
+          onLeadUpdated={handleLeadUpdated}
+        />
+      )}
       {isAddingLead && <AddLeadDialog onClose={() => setIsAddingLead(false)} onCreated={handleLeadCreated} />}
     </>
   );

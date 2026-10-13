@@ -37,7 +37,9 @@ export function LeadList({ leads, now, hasLoaded, isFiltered, onSelect }: LeadLi
         ) : (
           <EmptyState>
             {isFiltered
-              ? "No leads match your search or filter."
+              ? pinned.length > 0
+                ? "No other leads match your search or filter."
+                : "No leads match your search or filter."
               : leads.length > 0
                 ? "Every lead is in today's follow-ups."
                 : "No leads yet. Add your first lead to get started."}
