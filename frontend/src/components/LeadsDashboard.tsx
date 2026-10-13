@@ -1,0 +1,97 @@
+"use client";
+
+import { RotateCw } from "lucide-react";
+import { useState } from "react";
+
+import { AddLeadDialog } from "@/components/AddLeadDialog";
+import { Header } from "@/components/Header";
+import { LeadList } from "@/components/LeadList";
+import { LeadTimelineDialog } from "@/components/LeadTimelineDialog";
+import { Toolbar } from "@/components/Toolbar";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useLeads } from "@/hooks/useLeads";
+import { useNow } from "@/hooks/useNow";
+import { matchesFilters } from "@/lib/leads";
+import type { Lead, LeadStatus } from "@/types";
+
+export function LeadsDashboard() {
+  const [statusFilter, setStatusFilter] = useState<LeadStatus | null>(null);
+  const [searchInput, setSearchInput] = useState("");
+  const search = useDebouncedValue(searchInput.trim(), 250);
+
+  const { leads, error, isLoading, hasLoaded, reload, upsertLead } = useLeads(statusFilter, search);
+  const now = useNow();
+
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [isAddingLead, setIsAddingLead] = useState(false);
+
+  /** Apply the API's latest version of a lead to the list and the open dialog. */
+  function handleLeadUpdated(lead: Lead) {
+    upsertLead(lead);
+    setSelectedLead((current) => (current?.id === lead.id ? lead : current));
+  }
+
+  function handleLeadCreated(lead: Lead) {
+    setIsAddingLead(false);
+    if (matchesFilters(lead, { status: statusFilter, search })) {
+      upsertLead(lead);
+    } else {
+      // Clear filters so the new lead is visible; this refetches the list.
+      setStatusFilter(null);
+      setSearchInput("");
+    }
+  }
+
+  return (
+    <>
+      <Header onAddLead={() => setIsAddingLead(true)} />
+
+      <main className="mx-auto max-w-4xl space-y-8 px-4 py-6 sm:px-6">
+        <Toolbar
+          search={searchInput}
+          onSearchChange={setSearchInput}
+          status={statusFilter}
+          onStatusChange={setStatusFilter}
+        />
+
+        {error && (
+          <div role="alert" className="flex items-center justify-between gap-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <span>{error}</span>
+            <button
+              type="button"
+              onClick={reload}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-red-300 bg-white px-3 py-1 font-medium hover:bg-red-100"
+            >
+              <RotateCw aria-hidden className="size-3.5" />
+              Retry
+            </button>
+          </div>
+        )}
+
+        {/* With nothing loaded, the error banner alone says enough; empty states would mislead. */}
+        {!(error && leads.length === 0) && (
+          <div className={isLoading && hasLoaded ? "opacity-60 transition-opacity" : "transition-opacity"}>
+            <LeadList
+              leads={leads}
+              now={now}
+              hasLoaded={hasLoaded}
+              isFiltered={statusFilter !== null || search !== ""}
+              onSelect={setSelectedLead}
+            />
+          </div>
+        )}
+      </main>
+
+      {selectedLead && (
+        <LeadTimelineDialog
+          key={selectedLead.id}
+          lead={selectedLead}
+          now={now}
+          onClose={() => setSelectedLead(null)}
+          onLeadUpdated={handleLeadUpdated}
+        />
+      )}
+      {isAddingLead && <AddLeadDialog onClose={() => setIsAddingLead(false)} onCreated={handleLeadCreated} />}
+    </>
+  );
+}

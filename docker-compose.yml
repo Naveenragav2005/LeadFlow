@@ -1,0 +1,34 @@
+services:
+  backend:
+    build: ./backend
+    image: leadflow-api
+    environment:
+      DATABASE_URL: sqlite:////data/leadflow.db
+      CORS_ORIGINS: http://localhost:3000
+      # Load demo leads on first start (only when the database is empty).
+      SEED_DEMO_DATA: "true"
+    ports:
+      - "8000:8000"
+    volumes:
+      - leadflow-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # The browser calls the API directly, so this must be reachable from the user's machine.
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    image: leadflow-web
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  leadflow-data:
